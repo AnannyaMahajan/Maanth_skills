@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import { SKILLS } from '../constants';
 import { SkillCard } from '../components/SkillCard';
 import { CheckCircle2, Sparkles } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function LandingPage() {
+  const { user } = useAuth();
   const featuredSkills = SKILLS.slice(0, 3);
 
   return (
@@ -29,10 +31,10 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <Link
-                to="/marketplace"
+                to={user ? "/dashboard" : "/auth"}
                 className="bg-secondary-container text-on-secondary-container px-10 py-5 rounded-full font-black text-lg shadow-xl shadow-secondary-container/20 hover:scale-105 transition-transform text-center"
               >
-                Start Swapping
+                {user ? "Go to Dashboard" : "Start Swapping"}
               </Link>
               <button className="bg-surface-container-low text-primary px-10 py-5 rounded-full font-bold text-lg hover:bg-surface-container-high transition-colors">
                 How it works

@@ -1,12 +1,14 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Globe, Share2, Menu, X, Bell, MessageSquare, Repeat, CheckCircle2, Clock, Trash2 } from 'lucide-react';
+import { Search, Globe, Share2, Menu, X, Bell, MessageSquare, Repeat, CheckCircle2, Clock, Trash2, LogOut, User as UserIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export function Navbar() {
   const location = useLocation();
+  const { user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearNotification } = useNotifications();
@@ -162,12 +164,31 @@ export function Navbar() {
             </AnimatePresence>
           </div>
 
-          <Link
-            to="/marketplace"
-            className="bg-secondary-container text-on-secondary-container px-6 py-2.5 rounded-full font-bold text-sm hover:opacity-90 transition-all active:scale-95"
-          >
-            Exchange Skill
-          </Link>
+          {user ? (
+            <div className="flex items-center gap-4">
+              <Link
+                to="/marketplace"
+                className="bg-secondary-container text-on-secondary-container px-6 py-2.5 rounded-full font-bold text-sm hover:opacity-90 transition-all active:scale-95"
+              >
+                Exchange Skill
+              </Link>
+              <button 
+                onClick={() => logout()}
+                className="p-2 text-on-surface-variant hover:text-red-500 transition-colors"
+                title="Logout"
+              >
+                <LogOut size={20} />
+              </button>
+            </div>
+          ) : (
+            <Link
+              to="/auth"
+              className="bg-primary text-white px-8 py-2.5 rounded-full font-bold text-sm hover:opacity-90 transition-all active:scale-95 flex items-center gap-2"
+            >
+              <UserIcon size={16} />
+              Sign In
+            </Link>
+          )}
           <button 
             className="md:hidden text-primary"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -197,6 +218,18 @@ export function Navbar() {
                   {link.name}
                 </Link>
               ))}
+              {user && (
+                <button 
+                  onClick={() => {
+                    logout();
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 text-lg font-bold text-red-500 pt-4 border-t border-surface-container-high"
+                >
+                  <LogOut size={20} />
+                  Sign Out
+                </button>
+              )}
             </div>
           </motion.div>
         )}
