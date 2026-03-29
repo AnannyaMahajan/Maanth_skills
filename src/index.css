@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Epilogue", ui-sans-serif, system-ui, sans-serif;
+  --font-headline: "Epilogue", sans-serif;
+
+  --color-primary: #002a21;
+  --color-primary-container: #0a4235;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #7bae9d;
+
+  --color-secondary: #6f5d00;
+  --color-secondary-container: #fdd828;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #705e00;
+  --color-secondary-fixed: #fdd828;
+  --color-on-secondary-fixed: #241a00;
+
+  --color-tertiary: #002a24;
+  --color-tertiary-container: #00423a;
+  --color-on-tertiary: #ffffff;
+
+  --color-background: #fcf9ef;
+  --color-on-background: #1c1c16;
+
+  --color-surface: #fcf9ef;
+  --color-on-surface: #1c1c16;
+  --color-on-surface-variant: #404945;
+
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f7f4e9;
+  --color-surface-container: #f1eee4;
+  --color-surface-container-high: #ebe8de;
+  --color-surface-container-highest: #e5e2d9;
+
+  --color-outline: #707975;
+  --color-outline-variant: #c0c9c4;
+
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2.5rem;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-on-background font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-headline tracking-tighter;
+  }
+}
+
+.glass {
+  @apply bg-surface/20 backdrop-blur-xl border border-white/10;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

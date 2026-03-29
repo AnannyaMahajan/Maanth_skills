@@ -1,0 +1,5 @@
+{
+  "name": "Maanth",
+  "description": "A curated skill exchange marketplace for digital artisans and practitioners.",
+  "requestFramePermissions": ["camera", "microphone"]
+}
