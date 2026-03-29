@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Settings, Maximize2, Users, MessageSquare, MonitorUp, MonitorOff, Sparkles, Circle, Square } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Settings, Maximize2, Users, MessageSquare, MonitorUp, MonitorOff, Sparkles, Circle, Square, Download } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface VideoCallProps {
@@ -18,6 +18,15 @@ export default function VideoCall({ onEndCall }: VideoCallProps) {
   const [selectedVideoId, setSelectedVideoId] = React.useState<string>('');
   const [selectedAudioId, setSelectedAudioId] = React.useState<string>('');
   const [micLevel, setMicLevel] = React.useState(0);
+  const [lastRecordingUrl, setLastRecordingUrl] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (lastRecordingUrl) {
+        URL.revokeObjectURL(lastRecordingUrl);
+      }
+    };
+  }, [lastRecordingUrl]);
   
   const localVideoRef = React.useRef<HTMLVideoElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -33,6 +42,10 @@ export default function VideoCall({ onEndCall }: VideoCallProps) {
   const startRecording = () => {
     if (!stream) return;
     
+    if (lastRecordingUrl) {
+      URL.revokeObjectURL(lastRecordingUrl);
+    }
+    setLastRecordingUrl(null);
     recordedChunksRef.current = [];
     const mimeType = 'video/webm;codecs=vp9,opus';
     const options = MediaRecorder.isTypeSupported(mimeType) 
@@ -51,6 +64,9 @@ export default function VideoCall({ onEndCall }: VideoCallProps) {
       mediaRecorder.onstop = () => {
         const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
         const url = URL.createObjectURL(blob);
+        setLastRecordingUrl(url);
+        
+        // Auto-download as well for safety
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
@@ -59,7 +75,6 @@ export default function VideoCall({ onEndCall }: VideoCallProps) {
         a.click();
         setTimeout(() => {
           document.body.removeChild(a);
-          window.URL.revokeObjectURL(url);
         }, 100);
       };
 
@@ -313,7 +328,19 @@ export default function VideoCall({ onEndCall }: VideoCallProps) {
               </motion.div>
             )}
           </div>
-          <div className="flex gap-2 relative">
+          <div className="flex gap-2 relative items-center">
+            {lastRecordingUrl && (
+              <motion.a 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                href={lastRecordingUrl} 
+                download={`maanth-session-${new Date().toISOString()}.webm`}
+                className="flex items-center gap-2 px-4 py-2 bg-[#FDD828] text-primary rounded-full hover:scale-105 transition-all shadow-lg text-[10px] font-black uppercase tracking-widest"
+              >
+                <Download size={14} />
+                Download Recording
+              </motion.a>
+            )}
             <button 
               onClick={toggleFullscreen}
               className="p-2 bg-black/40 backdrop-blur-md text-white rounded-full hover:bg-black/60 transition-all"
