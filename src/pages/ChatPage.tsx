@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, Paperclip, MoreVertical, Video, Calendar, CheckCircle2, MessageSquare, Presentation, FileText, X, Link as LinkIcon, File, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Send, Paperclip, MoreVertical, Video, Calendar, CheckCircle2, MessageSquare, Presentation, FileText, X, Link as LinkIcon, File, Plus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useAuth } from '../contexts/AuthContext';
+import { uploadFile, getSignedUrl, deleteFile } from '../lib/storage';
+import { db, Resource } from '../lib/db';
 import Whiteboard from '../components/workspace/Whiteboard';
 import VideoCall from '../components/workspace/VideoCall';
 import ClassNotes from '../components/workspace/ClassNotes';
@@ -11,11 +14,15 @@ import ClassNotes from '../components/workspace/ClassNotes';
 type WorkspaceTab = 'chat' | 'whiteboard' | 'video' | 'notes' | 'resources';
 
 export default function ChatPage() {
+  const { user } = useAuth();
   const { addNotification } = useNotifications();
-  const [activeTab, setActiveTab] = React.useState<WorkspaceTab>('chat');
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
-  const [message, setMessage] = React.useState('');
-  const [messages, setMessages] = React.useState<any[]>([
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>('chat');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [message, setMessage] = useState('');
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [signedResourceUrls, setSignedResourceUrls] = useState<Record<string, string>>({});
+  const [uploadingResource, setUploadingResource] = useState(false);
+  const [messages, setMessages] = useState<any[]>([
     { 
       id: '1', 
       sender: 'Elena Rossi', 
@@ -49,11 +56,71 @@ export default function ChatPage() {
       }
     }
   ]);
-  const socketRef = React.useRef<WebSocket | null>(null);
-  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const resourceInputRef = useRef<HTMLInputElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
-  React.useEffect(() => {
+  const roomId = "julian-elena"; // Mock room ID
+
+  useEffect(() => {
+    async function loadResources() {
+      try {
+        const data = await db.resources.list(roomId);
+        setResources(data);
+        
+        // Generate signed URLs for all resources
+        const urls: Record<string, string> = {};
+        for (const res of data) {
+          urls[res.id] = await getSignedUrl(res.file_path);
+        }
+        setSignedResourceUrls(urls);
+      } catch (error) {
+        console.error('Error loading resources:', error);
+      }
+    }
+    loadResources();
+  }, [roomId]);
+
+  const handleResourceUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    setUploadingResource(true);
+    try {
+      const { path } = await uploadFile(file, user.uid, 'resources', roomId);
+      
+      const newResource = await db.resources.create({
+        room_id: roomId,
+        user_id: user.uid,
+        title: file.name,
+        file_path: path,
+        file_type: file.type,
+        file_size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+      });
+
+      setResources(prev => [newResource, ...prev]);
+      const signedUrl = await getSignedUrl(path);
+      setSignedResourceUrls(prev => ({ ...prev, [newResource.id]: signedUrl }));
+    } catch (error) {
+      console.error('Error uploading resource:', error);
+    } finally {
+      setUploadingResource(false);
+    }
+  };
+
+  const handleDeleteResource = async (resource: Resource) => {
+    try {
+      await deleteFile(resource.file_path);
+      await db.resources.delete(resource.id);
+      setResources(prev => prev.filter(r => r.id !== resource.id));
+    } catch (error) {
+      console.error('Error deleting resource:', error);
+    }
+  };
+
+  useEffect(() => {
     // Determine WebSocket protocol (ws or wss)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}`;
@@ -391,9 +458,30 @@ export default function ChatPage() {
                         className="relative flex items-center gap-4"
                       >
                         <div className="flex-1 relative">
-                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-primary">
+                          <button 
+                            type="button"
+                            onClick={() => attachmentInputRef.current?.click()}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 text-primary hover:scale-110 transition-transform"
+                          >
                             <Paperclip size={20} />
-                          </div>
+                          </button>
+                          <input 
+                            type="file"
+                            ref={attachmentInputRef}
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file && user) {
+                                try {
+                                  const { path, url } = await uploadFile(file, user.uid, 'chat', roomId);
+                                  // In a real app, we'd send the path/url via WebSocket
+                                  setMessage(prev => prev + ` [Attachment: ${file.name}](${url})`);
+                                } catch (error) {
+                                  console.error('Error uploading attachment:', error);
+                                }
+                              }
+                            }}
+                          />
                           <input 
                             type="text" 
                             placeholder="Type your message..."
@@ -452,37 +540,52 @@ export default function ChatPage() {
                         <h2 className="text-3xl font-black text-primary tracking-tight">Shared Resources</h2>
                         <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Learning materials for this swap</p>
                       </div>
-                      <button className="px-6 py-3 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:scale-105 transition-all shadow-lg flex items-center gap-2">
+                      <button 
+                        onClick={() => resourceInputRef.current?.click()}
+                        disabled={uploadingResource}
+                        className="px-6 py-3 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:scale-105 transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
+                      >
                         <Plus size={14} />
-                        Add Resource
+                        {uploadingResource ? 'Uploading...' : 'Add Resource'}
                       </button>
+                      <input 
+                        type="file"
+                        ref={resourceInputRef}
+                        className="hidden"
+                        onChange={handleResourceUpload}
+                      />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {[
-                        { title: 'UI Design Checklist', type: 'file', size: '1.2 MB', date: 'Oct 24', icon: File },
-                        { title: 'Pottery Wheel Basics Video', type: 'link', url: 'youtube.com/watch?v=...', date: 'Oct 22', icon: LinkIcon },
-                        { title: 'Figma Design System Template', type: 'link', url: 'figma.com/community/...', date: 'Oct 20', icon: LinkIcon },
-                        { title: 'Kiln Firing Guide PDF', type: 'file', size: '4.5 MB', date: 'Oct 18', icon: File },
-                      ].map((resource, i) => (
+                      {resources.map((resource, i) => (
                         <motion.div
-                          key={resource.title}
+                          key={resource.id}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: i * 0.1 }}
                           className="bg-white p-6 rounded-[2rem] shadow-sm border border-surface-container-high flex items-center gap-4 group hover:shadow-md transition-all cursor-pointer"
                         >
-                          <div className="w-12 h-12 bg-surface-container-low rounded-2xl flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
-                            <resource.icon size={20} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-primary truncate">{resource.title}</h4>
-                            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-tighter">
-                              {resource.type === 'file' ? resource.size : resource.url} • {resource.date}
-                            </p>
-                          </div>
-                          <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-xl transition-all">
-                            <MoreVertical size={18} />
+                          <a 
+                            href={signedResourceUrls[resource.id]} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex-1 flex items-center gap-4 min-w-0"
+                          >
+                            <div className="w-12 h-12 bg-surface-container-low rounded-2xl flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+                              <File size={20} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-bold text-primary truncate">{resource.title}</h4>
+                              <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-tighter">
+                                {resource.file_size} • {new Date(resource.created_at!).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </a>
+                          <button 
+                            onClick={() => handleDeleteResource(resource)}
+                            className="p-2 text-on-surface-variant hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                          >
+                            <Trash2 size={18} />
                           </button>
                         </motion.div>
                       ))}

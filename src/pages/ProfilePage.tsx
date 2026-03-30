@@ -1,25 +1,64 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, X, Globe, Link as LinkIcon, Mail, Pencil, Camera, CheckCircle2, BarChart3, Zap, Database, Image as ImageIcon, Palette, Compass, ArrowUpRight, Settings, MessageSquare, ShieldCheck, Clock, Shield } from 'lucide-react';
+import { cn } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
+import { uploadFile, getSignedUrl, deleteFile } from '../lib/storage';
+import { db } from '../lib/db';
 
 export default function ProfilePage() {
-  const [avatar, setAvatar] = React.useState("https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800&h=800&fit=crop");
-  const [searchQuery, setSearchQuery] = React.useState('');
+  const { user } = useAuth();
+  const [avatar, setAvatar] = useState("https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800&h=800&fit=crop");
+  const [avatarPath, setAvatarPath] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    async function loadProfile() {
+      if (!user) return;
+      try {
+        const profile = await db.profiles.get(user.uid);
+        if (profile?.avatar_url) {
+          setAvatarPath(profile.avatar_url);
+          const signedUrl = await getSignedUrl(profile.avatar_url);
+          setAvatar(signedUrl);
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error);
+      }
+    }
+    loadProfile();
+  }, [user]);
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatar(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file || !user) return;
+
+    setLoading(true);
+    try {
+      // If there's an existing avatar, delete it from storage first
+      if (avatarPath) {
+        await deleteFile(avatarPath);
+      }
+
+      // Upload new file
+      const { path, url } = await uploadFile(file, user.uid, 'profile', 'avatar');
+      
+      // Save path to database
+      await db.profiles.update(user.uid, { avatar_url: path });
+      
+      setAvatarPath(path);
+      setAvatar(url);
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -65,16 +104,22 @@ export default function ProfilePage() {
               <img 
                 src={avatar} 
                 alt="Julian Voss" 
-                className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
+                className={cn(
+                  "w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700",
+                  loading && "opacity-50"
+                )}
                 referrerPolicy="no-referrer"
               />
               <button 
                 onClick={handleAvatarClick}
-                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
+                disabled={loading}
+                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white disabled:opacity-50"
               >
                 <div className="flex flex-col items-center gap-2">
                   <Camera size={32} />
-                  <span className="text-xs font-bold uppercase tracking-widest">Update Avatar</span>
+                  <span className="text-xs font-bold uppercase tracking-widest">
+                    {loading ? 'Uploading...' : 'Update Avatar'}
+                  </span>
                 </div>
               </button>
               <input 
