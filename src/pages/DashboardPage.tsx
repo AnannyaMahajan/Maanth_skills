@@ -18,13 +18,13 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  FileText
+  FileText,
+  BadgeCheck
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/db';
-import { supabase } from '../lib/supabase';
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
@@ -33,57 +33,36 @@ export default function DashboardPage() {
   const [skillHistory, setSkillHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchData = async () => {
+    if (!user) return;
+    try {
+      const [count, swaps, history] = await Promise.all([
+        db.notes.count(user.uid),
+        db.swap_requests.list(user.uid).catch(() => []),
+        db.skill_history.list(user.uid).catch(() => [])
+      ]);
+      setNoteCount(count);
+      setSwapRequests(swaps.length > 0 ? swaps : [
+        { title: 'Digital Illustration for SEO Writing', with_user_name: 'Sarah Jenkins', status: 'Accepted', category: 'design' },
+        { title: 'React Mentorship for Pottery Lessons', with_user_name: 'David K.', status: 'Pending', category: 'code' },
+        { title: 'Mandarin Practice for UI Design', with_user_name: 'Li Wei', status: 'Accepted', category: 'languages' }
+      ]);
+      setSkillHistory(history.length > 0 ? history : [
+        { skill_name: 'Digital Illustration', participant_name: 'Sarah Jenkins', status: 'Completed', date: 'Oct 12, 2024' },
+        { skill_name: 'SEO Writing', participant_name: 'Sarah Jenkins', status: 'Completed', date: 'Oct 12, 2024' },
+        { skill_name: 'Pottery Basics', participant_name: 'David K.', status: 'Cancelled', date: 'Sep 28, 2024' },
+        { skill_name: 'React Mentorship', participant_name: 'David K.', status: 'In Progress', date: 'Ongoing' },
+      ]);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
-
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [count, swaps, history] = await Promise.all([
-          db.notes.count(user.id),
-          db.swap_requests.list(user.id).catch(() => [
-            { title: 'Digital Illustration for SEO Writing', with_user_name: 'Sarah Jenkins', status: 'Accepted', category: 'design' },
-            { title: 'React Mentorship for Pottery Lessons', with_user_name: 'David K.', status: 'Pending', category: 'code' },
-            { title: 'Mandarin Practice for UI Design', with_user_name: 'Li Wei', status: 'Accepted', category: 'languages' }
-          ]),
-          db.skill_history.list(user.id).catch(() => [
-            { skill_name: 'Digital Illustration', participant_name: 'Sarah Jenkins', status: 'Completed', date: 'Oct 12, 2024' },
-            { skill_name: 'SEO Writing', participant_name: 'Sarah Jenkins', status: 'Completed', date: 'Oct 12, 2024' },
-            { skill_name: 'Pottery Basics', participant_name: 'David K.', status: 'Cancelled', date: 'Sep 28, 2024' },
-            { skill_name: 'React Mentorship', participant_name: 'David K.', status: 'In Progress', date: 'Ongoing' },
-          ])
-        ]);
-        setNoteCount(count);
-        setSwapRequests(swaps);
-        setSkillHistory(history);
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
-
-    const subscription = supabase
-      .channel('dashboard_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notes',
-          filter: `user_id=eq.${user.id}`
-        },
-        () => {
-          fetchData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
   }, [user]);
 
   const getIcon = (category: string) => {
@@ -123,54 +102,31 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-80px)] overflow-hidden">
-      {/* Sidebar Navigation */}
-      <aside className="w-72 bg-surface-container-low flex flex-col h-full border-r-0">
-        <nav className="flex-1 px-4 py-8 space-y-2">
-          <Link to="/dashboard" className="flex items-center gap-4 px-4 py-3 text-primary bg-surface-container-highest rounded-xl font-bold transition-all duration-300">
-            <LayoutDashboard size={20} />
-            <span>Dashboard</span>
-          </Link>
-          <Link to="/marketplace" className="flex items-center gap-4 px-4 py-3 text-on-surface-variant hover:bg-surface-container rounded-xl font-medium transition-all duration-300">
-            <Store size={20} />
-            <span>Marketplace</span>
-          </Link>
-          <Link to="/profile" className="flex items-center gap-4 px-4 py-3 text-on-surface-variant hover:bg-surface-container rounded-xl font-medium transition-all duration-300">
-            <User size={20} />
-            <span>Profile</span>
-          </Link>
-          <Link to="/settings" className="flex items-center gap-4 px-4 py-3 text-on-surface-variant hover:bg-surface-container rounded-xl font-medium transition-all duration-300">
-            <Settings size={20} />
-            <span>Settings</span>
-          </Link>
-        </nav>
-        <div className="p-8">
-          <Link 
-            to="/marketplace"
-            className="w-full py-4 bg-secondary-container text-on-secondary-container rounded-full font-bold text-sm tracking-wide hover:opacity-90 transition-all flex items-center justify-center gap-2"
-          >
-            <ArrowRightLeft size={18} />
-            Exchange Skill
-          </Link>
-        </div>
-      </aside>
-
+    <div className="min-h-screen bg-surface-bright">
       {/* Main Content Area */}
-      <main className="flex-1 h-full overflow-y-auto bg-surface-bright">
+      <main className="max-w-7xl mx-auto">
         {/* Header / Welcome */}
         <motion.header 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="px-12 pt-12 pb-8 flex justify-between items-end"
+          className="px-12 pt-12 pb-8 flex flex-col md:flex-row md:items-end justify-between gap-8"
         >
-          <div>
+          <div className="max-w-2xl">
             <p className="text-sm font-bold uppercase tracking-widest text-on-surface-variant mb-2">Welcome back</p>
-            <h2 className="text-5xl font-extrabold text-primary tracking-tighter">
+            <h2 className="text-5xl font-extrabold text-primary tracking-tighter mb-4">
               {profile?.full_name?.split(' ')[0] || 'User'}.
             </h2>
+            <p className="text-on-surface-variant text-lg font-medium leading-relaxed">
+              Your personal command center for skill evolution. Track your active swaps, manage your 
+              learning schedule, and discover new opportunities for growth within the Maanth community.
+            </p>
           </div>
           <div className="flex items-center gap-4">
+            <div className="text-right hidden md:block">
+              <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-1">Account Status</p>
+              <p className="text-xs font-bold text-primary">{profile?.role === 'pro' ? 'Pro Member' : 'Free Plan'}</p>
+            </div>
             <div className="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden border-2 border-primary/10">
               {profile?.avatar_url ? (
                 <img 
@@ -265,23 +221,29 @@ export default function DashboardPage() {
               <div className="bg-surface-container-low p-8 rounded-xl">
                 <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant mb-6">Offered Skills</h3>
                 <div className="flex flex-wrap gap-2">
-                  {['UI Design', 'Design Systems', 'Prototyping'].map(skill => (
-                    <span key={skill} className="px-4 py-2 bg-primary text-on-primary rounded-full text-xs font-bold">{skill}</span>
-                  ))}
-                  <button className="w-8 h-8 rounded-full border border-outline-variant flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all">
+                  {profile?.skills_to_offer?.map(skill => (
+                    <span key={skill.name} className={cn(
+                      "px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2",
+                      skill.verified ? "bg-green-500 text-white" : "bg-primary text-on-primary"
+                    )}>
+                      {skill.name}
+                      {skill.verified && <BadgeCheck size={14} />}
+                    </span>
+                  )) || <p className="text-xs text-muted-foreground italic">No skills offered yet</p>}
+                  <Link to="/onboarding" className="w-8 h-8 rounded-full border border-outline-variant flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all">
                     <Plus size={16} />
-                  </button>
+                  </Link>
                 </div>
               </div>
               <div className="bg-surface-container-low p-8 rounded-xl">
                 <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant mb-6">Wanted Skills</h3>
                 <div className="flex flex-wrap gap-2">
-                  {['Pottery', 'Mandarin', 'SEO'].map(skill => (
+                  {profile?.skills_to_learn?.map(skill => (
                     <span key={skill} className="px-4 py-2 bg-surface-container-highest text-primary rounded-full text-xs font-bold">{skill}</span>
-                  ))}
-                  <button className="w-8 h-8 rounded-full border border-outline-variant flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all">
+                  )) || <p className="text-xs text-muted-foreground italic">No skills wanted yet</p>}
+                  <Link to="/onboarding" className="w-8 h-8 rounded-full border border-outline-variant flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all">
                     <Plus size={16} />
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>

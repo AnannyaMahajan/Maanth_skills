@@ -8,17 +8,26 @@ import { useAuth } from '../contexts/AuthContext';
 
 export function Navbar() {
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearNotification } = useNotifications();
 
-  const navLinks = [
-    { name: 'Marketplace', path: '/marketplace' },
-    { name: 'Match', path: '/match' },
-    { name: 'Dashboard', path: '/dashboard' },
-    { name: 'Profile', path: '/profile' },
-  ];
+  const navLinks = user 
+    ? profile?.onboarding_completed
+      ? [
+          { name: 'Marketplace', path: '/marketplace' },
+          { name: 'About Us', path: '/about' },
+          { name: 'Match', path: '/match' },
+          { name: 'Dashboard', path: '/dashboard' },
+          { name: 'Profile', path: '/profile' },
+        ]
+      : [] // Hide all links during onboarding
+    : [
+        { name: 'Marketplace', path: '/marketplace' },
+        { name: 'Match', path: '/match' },
+        { name: 'About Us', path: '/about' },
+      ];
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -60,118 +69,122 @@ export function Navbar() {
             <Search size={20} />
           </button>
 
-          {/* Notifications */}
-          <div className="relative">
-            <button 
-              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-              className="relative p-2 text-on-surface-variant hover:text-primary transition-colors"
-            >
-              <Bell size={20} />
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-background">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
+          {/* Notifications - Only show if onboarding complete */}
+          {user && profile?.onboarding_completed && (
+            <div className="relative">
+              <button 
+                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                className="relative p-2 text-on-surface-variant hover:text-primary transition-colors"
+              >
+                <Bell size={20} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-background">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
 
-            <AnimatePresence>
-              {isNotificationsOpen && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-40" 
-                    onClick={() => setIsNotificationsOpen(false)} 
-                  />
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 mt-2 w-80 bg-white rounded-3xl shadow-2xl border border-surface-container-high overflow-hidden z-50"
-                  >
-                    <div className="p-4 border-b border-surface-container-high flex justify-between items-center bg-surface-container-low">
-                      <h3 className="text-sm font-black text-primary uppercase tracking-widest">Notifications</h3>
-                      {unreadCount > 0 && (
-                        <button 
-                          onClick={markAllAsRead}
-                          className="text-[10px] font-bold text-primary hover:underline"
-                        >
-                          Mark all as read
-                        </button>
-                      )}
-                    </div>
-                    <div className="max-h-[400px] overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <div className="p-8 text-center space-y-2">
-                          <Bell size={32} className="mx-auto text-on-surface-variant opacity-20" />
-                          <p className="text-xs font-bold text-on-surface-variant">No notifications yet</p>
-                        </div>
-                      ) : (
-                        notifications.map((n) => (
-                          <div 
-                            key={n.id}
-                            className={cn(
-                              "p-4 border-b border-surface-container-high last:border-0 transition-colors relative group",
-                              !n.read ? "bg-primary/5" : "hover:bg-surface-container-low"
-                            )}
+              <AnimatePresence>
+                {isNotificationsOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setIsNotificationsOpen(false)} 
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 mt-2 w-80 bg-white rounded-3xl shadow-2xl border border-surface-container-high overflow-hidden z-50"
+                    >
+                      <div className="p-4 border-b border-surface-container-high flex justify-between items-center bg-surface-container-low">
+                        <h3 className="text-sm font-black text-primary uppercase tracking-widest">Notifications</h3>
+                        {unreadCount > 0 && (
+                          <button 
+                            onClick={markAllAsRead}
+                            className="text-[10px] font-bold text-primary hover:underline"
                           >
-                            <Link 
-                              to={n.link || '#'} 
-                              onClick={() => {
-                                markAsRead(n.id);
-                                setIsNotificationsOpen(false);
-                              }}
-                              className="flex gap-3"
-                            >
-                              <div className="mt-1 shrink-0">
-                                {getIcon(n.type)}
-                              </div>
-                              <div className="space-y-1">
-                                <p className={cn("text-xs font-bold", !n.read ? "text-primary" : "text-on-surface")}>
-                                  {n.title}
-                                </p>
-                                <p className="text-[10px] text-on-surface-variant leading-tight line-clamp-2">
-                                  {n.description}
-                                </p>
-                                <p className="text-[8px] font-bold text-on-surface-variant uppercase tracking-tighter">
-                                  {new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </p>
-                              </div>
-                            </Link>
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                clearNotification(n.id);
-                              }}
-                              className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-1 text-on-surface-variant hover:text-red-500 transition-all"
-                            >
-                              <Trash2 size={12} />
-                            </button>
+                            Mark all as read
+                          </button>
+                        )}
+                      </div>
+                      <div className="max-h-[400px] overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <div className="p-8 text-center space-y-2">
+                            <Bell size={32} className="mx-auto text-on-surface-variant opacity-20" />
+                            <p className="text-xs font-bold text-on-surface-variant">No notifications yet</p>
                           </div>
-                        ))
+                        ) : (
+                          notifications.map((n) => (
+                            <div 
+                              key={n.id}
+                              className={cn(
+                                "p-4 border-b border-surface-container-high last:border-0 transition-colors relative group",
+                                !n.read ? "bg-primary/5" : "hover:bg-surface-container-low"
+                              )}
+                            >
+                              <Link 
+                                to={n.link || '#'} 
+                                onClick={() => {
+                                  markAsRead(n.id);
+                                  setIsNotificationsOpen(false);
+                                }}
+                                className="flex gap-3"
+                              >
+                                <div className="mt-1 shrink-0">
+                                  {getIcon(n.type)}
+                                </div>
+                                <div className="space-y-1">
+                                  <p className={cn("text-xs font-bold", !n.read ? "text-primary" : "text-on-surface")}>
+                                    {n.title}
+                                  </p>
+                                  <p className="text-[10px] text-on-surface-variant leading-tight line-clamp-2">
+                                    {n.description}
+                                  </p>
+                                  <p className="text-[8px] font-bold text-on-surface-variant uppercase tracking-tighter">
+                                    {new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </p>
+                                </div>
+                              </Link>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  clearNotification(n.id);
+                                }}
+                                className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-1 text-on-surface-variant hover:text-red-500 transition-all"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      {notifications.length > 0 && (
+                        <Link 
+                          to="/dashboard" 
+                          onClick={() => setIsNotificationsOpen(false)}
+                          className="block p-3 text-center text-[10px] font-black text-primary uppercase tracking-widest bg-surface-container-low hover:bg-surface-container transition-colors"
+                        >
+                          View All Activity
+                        </Link>
                       )}
-                    </div>
-                    {notifications.length > 0 && (
-                      <Link 
-                        to="/dashboard" 
-                        onClick={() => setIsNotificationsOpen(false)}
-                        className="block p-3 text-center text-[10px] font-black text-primary uppercase tracking-widest bg-surface-container-low hover:bg-surface-container transition-colors"
-                      >
-                        View All Activity
-                      </Link>
-                    )}
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-          </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
 
           {user ? (
             <div className="flex items-center gap-4">
-              <Link
-                to="/marketplace"
-                className="bg-secondary-container text-on-secondary-container px-6 py-2.5 rounded-full font-bold text-sm hover:opacity-90 transition-all active:scale-95"
-              >
-                Exchange Skill
-              </Link>
+              {profile?.onboarding_completed && (
+                <Link
+                  to="/marketplace"
+                  className="bg-secondary-container text-on-secondary-container px-6 py-2.5 rounded-full font-bold text-sm hover:opacity-90 transition-all active:scale-95"
+                >
+                  Exchange Skill
+                </Link>
+              )}
               <button 
                 onClick={() => logout()}
                 className="p-2 text-on-surface-variant hover:text-red-500 transition-colors"

@@ -257,7 +257,13 @@ export default function MatchPage() {
       {/* Sidebar - Discovery */}
       <aside className="w-full lg:w-80 shrink-0 space-y-10">
         <div className="bg-surface-container-low p-8 rounded-[2rem] space-y-8">
-          <h2 className="text-3xl font-black text-primary tracking-tight">Discovery</h2>
+          <div className="space-y-4">
+            <h2 className="text-3xl font-black text-primary tracking-tight">Discovery</h2>
+            <p className="text-xs text-on-surface-variant font-medium leading-relaxed">
+              Our matching engine analyzes your profile to find the most compatible skill partners. 
+              Adjust your discovery settings below to refine your results.
+            </p>
+          </div>
           
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -304,6 +310,21 @@ export default function MatchPage() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+
+        <div className="p-8 bg-primary/5 rounded-[2rem] border border-primary/10 space-y-4">
+          <h4 className="text-xs font-black text-primary uppercase tracking-widest">How Matching Works</h4>
+          <div className="space-y-3 text-[10px] text-on-surface-variant font-medium leading-relaxed">
+            <p>
+              <span className="font-bold text-primary">1. Skill Alignment:</span> We prioritize users who have exactly what you want and vice versa.
+            </p>
+            <p>
+              <span className="font-bold text-primary">2. Verification:</span> Verified practitioners receive a boost in the matching algorithm.
+            </p>
+            <p>
+              <span className="font-bold text-primary">3. Interest Overlap:</span> Shared hobbies and professional interests increase the likelihood of a successful swap.
+            </p>
           </div>
         </div>
       </aside>

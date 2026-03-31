@@ -4,6 +4,7 @@ import { SKILLS } from '../constants';
 import { SkillCard } from '../components/SkillCard';
 import { CheckCircle2, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { cn } from '../lib/utils';
 
 export default function LandingPage() {
   const { user } = useAuth();
@@ -206,6 +207,126 @@ export default function LandingPage() {
           </div>
         </div>
       </motion.section>
+
+      {/* Categories Section */}
+      <section className="py-32 border-y border-surface-container-high">
+        <div className="max-w-7xl mx-auto px-8">
+          <div className="text-center max-w-3xl mx-auto mb-20 space-y-4">
+            <h2 className="text-4xl md:text-5xl font-black text-primary tracking-tighter">Explore by Discipline</h2>
+            <p className="text-on-surface-variant text-lg font-medium">
+              From traditional craftsmanship to cutting-edge digital arts, find the perfect domain for your next evolution.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { name: 'Digital Design', count: '1.2K Listings', color: 'bg-blue-50' },
+              { name: 'Software Engineering', count: '2.4K Listings', color: 'bg-green-50' },
+              { name: 'Fine Arts & Pottery', count: '850 Listings', color: 'bg-orange-50' },
+              { name: 'Marketing & Growth', count: '1.1K Listings', color: 'bg-purple-50' },
+              { name: 'Data Science & AI', count: '1.5K Listings', color: 'bg-indigo-50' },
+              { name: 'Music & Sound Design', count: '600 Listings', color: 'bg-pink-50' },
+              { name: 'Writing & Content', count: '900 Listings', color: 'bg-yellow-50' },
+              { name: 'Business Strategy', count: '1.3K Listings', color: 'bg-teal-50' },
+            ].map((cat, i) => (
+              <motion.div
+                key={cat.name}
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.05 }}
+                className={cn("p-8 rounded-[2rem] border border-surface-container-high hover:shadow-xl transition-all cursor-pointer group", cat.color)}
+              >
+                <h4 className="font-black text-primary mb-1 group-hover:translate-x-1 transition-transform">{cat.name}</h4>
+                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">{cat.count}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="py-32 bg-primary text-white overflow-hidden relative">
+        <div className="max-w-7xl mx-auto px-8 relative z-10">
+          <div className="grid lg:grid-cols-2 gap-20 items-center">
+            <div className="space-y-8">
+              <h2 className="text-5xl md:text-7xl font-black tracking-tighter leading-[0.9]">
+                HEAR FROM OUR <br /><span className="italic text-secondary">GLOBAL COMMUNITY.</span>
+              </h2>
+              <p className="text-xl opacity-80 font-medium leading-relaxed max-w-lg">
+                Real stories from real practitioners who have transformed their lives through the power of skill exchange.
+              </p>
+              <div className="flex gap-4 pt-4">
+                <div className="flex -space-x-4">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <img key={i} src={`https://picsum.photos/seed/user${i}/100/100`} className="w-12 h-12 rounded-full border-4 border-primary object-cover" />
+                  ))}
+                </div>
+                <div className="flex flex-col justify-center">
+                  <span className="font-black text-xl">4.9/5</span>
+                  <span className="text-[10px] uppercase font-bold opacity-60 tracking-widest">Average User Rating</span>
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-6">
+              {[
+                { name: 'Sarah L.', role: 'UX Designer', text: "Maanth completely changed how I view education. I traded my Figma skills for advanced React patterns and saved thousands in course fees." },
+                { name: 'David K.', role: 'Fullstack Dev', text: "The quality of connections here is unmatched. You're not just learning a skill; you're building a professional network of high-level peers." }
+              ].map((t, i) => (
+                <motion.div 
+                  key={t.name}
+                  initial={{ opacity: 0, x: 50 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.2 }}
+                  className="bg-white/10 backdrop-blur-md p-8 rounded-[2rem] border border-white/10 space-y-4"
+                >
+                  <p className="text-lg font-medium italic">"{t.text}"</p>
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-secondary-container text-primary flex items-center justify-center font-black text-xs">
+                      {t.name[0]}
+                    </div>
+                    <div>
+                      <h4 className="font-bold">{t.name}</h4>
+                      <p className="text-[10px] uppercase font-bold opacity-60 tracking-widest">{t.role}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_bottom_left,rgba(10,66,53,1)_0%,rgba(0,42,33,1)_100%)]" />
+      </section>
+
+      {/* FAQ Section */}
+      <section className="py-32">
+        <div className="max-w-3xl mx-auto px-8 space-y-16">
+          <div className="text-center space-y-4">
+            <h2 className="text-4xl font-black text-primary tracking-tight">Frequently Asked Questions</h2>
+            <p className="text-on-surface-variant font-medium">Everything you need to know about the Maanth protocol.</p>
+          </div>
+          <div className="space-y-6">
+            {[
+              { q: "Is Maanth really free?", a: "Yes. Maanth is built on the principle of direct value exchange. We do not charge transaction fees for skill swaps. Our platform is sustained by optional premium features for power users." },
+              { q: "How do I know if a partner is reliable?", a: "Every user has a verified profile with a history of successful swaps and peer reviews. We encourage starting with smaller sessions to build trust." },
+              { q: "What if I don't have a 'high-level' skill?", a: "Everyone has something valuable to offer. Whether it's language tutoring, basic coding, or even organizational skills, there's always someone looking to learn what you know." },
+              { q: "Can I swap multiple skills at once?", a: "Absolutely. Many of our most successful users engage in multi-disciplinary swaps that span several weeks or months." }
+            ].map((faq, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="p-8 bg-surface-container-low rounded-[2rem] border border-surface-container-high space-y-3"
+              >
+                <h4 className="text-lg font-black text-primary">{faq.q}</h4>
+                <p className="text-on-surface-variant font-medium leading-relaxed">{faq.a}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* CTA Section */}
       <motion.section 

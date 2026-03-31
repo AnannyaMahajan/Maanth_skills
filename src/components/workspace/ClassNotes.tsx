@@ -4,7 +4,6 @@ import { FileText, Save, Plus, Trash2, Clock, CheckCircle2, MoreVertical, AlertC
 import { cn } from '../../lib/utils';
 import { db } from '../../lib/db';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 
@@ -34,67 +33,27 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
   const activeNote = notes.find(n => n.id === activeNoteId);
   const isPro = profile?.role === 'pro';
 
+  const loadNotes = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const data = await db.notes.list(user.uid);
+      setNotes(data || []);
+      if (data && data.length > 0 && !activeNoteId) {
+        setActiveNoteId(data[0].id);
+      }
+    } catch (error) {
+      console.error('Error loading notes:', error);
+      toast.error('Failed to load notes');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
-
-    const loadNotes = async () => {
-      setLoading(true);
-      try {
-        const data = await db.notes.list(user.id);
-        setNotes(data || []);
-        if (data && data.length > 0) {
-          setActiveNoteId(data[0].id);
-        }
-      } catch (error) {
-        console.error('Error loading notes:', error);
-        toast.error('Failed to load notes');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadNotes();
-
-    // Subscribe to changes
-    const channel = supabase
-      .channel('notes_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notes',
-          filter: `user_id=eq.${user.id}`
-        },
-        () => {
-          loadNotes();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      channel.unsubscribe();
-    };
   }, [user]);
-
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'notes_update' && data.roomId === roomId) {
-          // For real-time collaboration, we might still want to sync local state
-          // but the database is the source of truth
-        }
-      } catch (e) {
-        console.error('Error parsing notes message:', e);
-      }
-    };
-
-    socket.addEventListener('message', handleMessage);
-    return () => socket.removeEventListener('message', handleMessage);
-  }, [socket, roomId]);
 
   const updateNote = async (content: string) => {
     if (!activeNoteId || !user) return;
@@ -102,7 +61,7 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
     setIsSaving(true);
     try {
       const updated = await db.notes.update(activeNoteId, { content });
-      setNotes(prev => prev.map(n => n.id === activeNoteId ? updated : n));
+      setNotes(prev => prev.map(n => n.id === activeNoteId ? { ...n, ...updated } as Note : n));
       
       if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({
@@ -125,7 +84,7 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
     
     try {
       const updated = await db.notes.update(activeNoteId, { title });
-      setNotes(prev => prev.map(n => n.id === activeNoteId ? updated : n));
+      setNotes(prev => prev.map(n => n.id === activeNoteId ? { ...n, ...updated } as Note : n));
     } catch (error) {
       console.error('Error updating title:', error);
       toast.error('Failed to update title');
@@ -138,7 +97,7 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
     // SaaS Plan Logic: Check limit for non-pro users
     try {
       if (!isPro) {
-        const count = await db.notes.count(user.id);
+        const count = await db.notes.count(user.uid);
         if (count >= 3) {
           setShowLimitModal(true);
           return;
@@ -146,7 +105,7 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
       }
 
       const newNote = await db.notes.create({
-        user_id: user.id,
+        user_id: user.uid,
         title: 'Untitled Note',
         content: ''
       });
@@ -165,7 +124,7 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
     if (!user) return;
     setUpgrading(true);
     try {
-      await db.profiles.update(user.id, { role: 'pro' });
+      await db.profiles.update(user.uid, { role: 'pro' });
       await refreshProfile();
       setShowLimitModal(false);
       toast.success('Welcome to Pro! Unlimited notes unlocked.');

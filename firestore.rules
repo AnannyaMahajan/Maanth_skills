@@ -1,0 +1,132 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: profiles
+    // Document ID: userId (Firebase UID)
+    // Fields:
+    //   - id: string (required)
+    //   - full_name: string (required)
+    //   - username: string
+    //   - role: string (free, pro, admin)
+    //   - intent: string (learn, swap, teach)
+    //   - onboarding_completed: boolean
+    //   - skills_to_learn: list
+    //   - skills_to_offer: list
+    //
+    // Collection: notes
+    // Document ID: noteId
+    // Fields:
+    //   - user_id: string (required)
+    //   - title: string (required)
+    //   - content: string (required)
+    //
+    // Collection: swap_requests
+    // Document ID: requestId
+    // Fields:
+    //   - user_id: string (required)
+    //   - partner_name: string (required)
+    //   - skill: string (required)
+    //   - status: string (pending, accepted, declined)
+    //
+    // Collection: skill_history
+    // Document ID: historyId
+    // Fields:
+    //   - user_id: string (required)
+    //   - skill: string (required)
+    //   - progress: int
+    //   - status: string
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "24f3002875@ds.study.iitm.ac.in" && request.auth.token.email_verified == true));
+    }
+
+    // ===============================================================
+    // Validation Functions
+    // ===============================================================
+
+    function isValidProfile(data) {
+      return data.full_name is string && data.full_name.size() > 0 && data.full_name.size() < 100 &&
+             (data.username == null || (data.username is string && data.username.size() < 50)) &&
+             (data.bio == null || (data.bio is string && data.bio.size() < 1000)) &&
+             (data.location == null || (data.location is string && data.location.size() < 100)) &&
+             (data.college == null || (data.college is string && data.college.size() < 100));
+    }
+
+    function isValidNote(data) {
+      return data.user_id == request.auth.uid &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.content is string && data.content.size() < 10000;
+    }
+
+    function isValidSwapRequest(data) {
+      return data.user_id == request.auth.uid &&
+             data.partner_name is string && data.partner_name.size() > 0 &&
+             data.skill is string && data.skill.size() > 0;
+    }
+
+    function isValidSkillHistory(data) {
+      return data.user_id == request.auth.uid &&
+             data.skill is string && data.skill.size() > 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /profiles/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidProfile(request.resource.data) && (request.resource.data.role == 'free' || isAdmin());
+      allow update: if isOwner(userId) && isValidProfile(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /notes/{noteId} {
+      allow read: if isAuthenticated() && resource.data.user_id == request.auth.uid;
+      allow create: if isAuthenticated() && isValidNote(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.user_id == request.auth.uid && isValidNote(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.user_id == request.auth.uid;
+    }
+
+    match /swap_requests/{requestId} {
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidSwapRequest(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isAdmin()) && isValidSwapRequest(request.resource.data);
+    }
+
+    match /skill_history/{historyId} {
+      allow read: if isAuthenticated() && resource.data.user_id == request.auth.uid;
+      allow create: if isAuthenticated() && isValidSkillHistory(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.user_id == request.auth.uid && isValidSkillHistory(request.resource.data);
+    }
+
+    match /resources/{resourceId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+    }
+    
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

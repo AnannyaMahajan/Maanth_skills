@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signInWithPopup, 
+  GoogleAuthProvider 
+} from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
@@ -20,31 +26,11 @@ export default function AuthPage() {
 
     try {
       if (isLogin) {
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        
-        if (signInError) throw signInError;
-        
-        if (data.user && !data.user.email_confirmed_at) {
-          await supabase.auth.signOut();
-          navigate('/verify', { state: { email: data.user.email } });
-          return;
-        }
-        
+        await signInWithEmailAndPassword(auth, email, password);
         navigate('/dashboard');
       } else {
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-        
-        if (signUpError) throw signUpError;
-        
-        if (data.user) {
-          navigate('/verify', { state: { email: data.user.email } });
-        }
+        await createUserWithEmailAndPassword(auth, email, password);
+        navigate('/dashboard');
       }
     } catch (err: any) {
       console.error(err);
@@ -58,13 +44,9 @@ export default function AuthPage() {
     setError(null);
     setLoading(true);
     try {
-      const { error: googleError } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`
-        }
-      });
-      if (googleError) throw googleError;
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      navigate('/dashboard');
     } catch (err: any) {
       console.error(err);
       setError('Failed to sign in with Google. Please try again.');

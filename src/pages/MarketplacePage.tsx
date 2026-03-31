@@ -70,20 +70,42 @@ export default function MarketplacePage() {
           </div>
         </div>
 
-        <div className="p-6 bg-surface-container-low rounded-xl">
-          <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">Pro Tip</p>
-          <p className="text-sm text-on-surface-variant leading-relaxed">
-            Artisans are more likely to accept swaps involving complex creative coding projects.
+        <div className="p-6 bg-surface-container-low rounded-xl space-y-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">Pro Tip</p>
+            <p className="text-sm text-on-surface-variant leading-relaxed">
+              Artisans are more likely to accept swaps involving complex creative coding projects.
+            </p>
+          </div>
+          <div className="pt-4 border-t border-surface-container-high">
+            <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">Community Guidelines</p>
+            <ul className="text-[10px] text-on-surface-variant space-y-2 font-medium">
+              <li>• Be respectful and professional</li>
+              <li>• Clearly define swap expectations</li>
+              <li>• Provide honest feedback after swaps</li>
+              <li>• Keep communication on-platform</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="p-6 bg-primary/5 rounded-xl border border-primary/10">
+          <h4 className="text-xs font-black text-primary uppercase tracking-widest mb-3">Why Swap?</h4>
+          <p className="text-xs text-on-surface-variant leading-relaxed font-medium">
+            Skill swapping is the most efficient way to learn. By teaching what you know, you solidify your own mastery while gaining new perspectives from your partner.
           </p>
         </div>
       </aside>
 
       {/* Main Content Area */}
       <section className="flex-grow">
-        <div className="mb-10 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
-          <div>
-            <h1 className="text-4xl font-extrabold tracking-tighter text-primary mb-2">The Marketplace</h1>
-            <p className="text-on-surface-variant">Discover human talent curated for the digital era.</p>
+        <div className="mb-10 flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+          <div className="max-w-xl">
+            <h1 className="text-5xl font-black tracking-tighter text-primary mb-4">The Marketplace</h1>
+            <p className="text-on-surface-variant text-lg font-medium leading-relaxed">
+              Welcome to the global hub of human expertise. Browse curated skills from verified practitioners. 
+              Whether you're looking to master a new craft or share your own, this is where intentional 
+              growth begins.
+            </p>
           </div>
           
           <div className="flex flex-col sm:flex-row items-center gap-4">

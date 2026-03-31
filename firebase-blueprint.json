@@ -1,0 +1,104 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "User ID (matches Firebase UID)" },
+        "username": { "type": "string", "description": "Unique username" },
+        "full_name": { "type": "string", "description": "User's full name" },
+        "avatar_url": { "type": "string", "description": "URL to user's avatar" },
+        "role": { "type": "string", "enum": ["free", "pro", "admin"], "description": "User's subscription role" },
+        "bio": { "type": "string", "description": "User's bio" },
+        "location": { "type": "string", "description": "User's location" },
+        "college": { "type": "string", "description": "User's college/organization" },
+        "social_links": {
+          "type": "object",
+          "properties": {
+            "linkedin": { "type": "string" },
+            "github": { "type": "string" },
+            "portfolio": { "type": "string" }
+          }
+        },
+        "intent": { "type": "string", "enum": ["learn", "swap", "teach"], "description": "Primary intent" },
+        "onboarding_completed": { "type": "boolean", "description": "Whether onboarding is finished" },
+        "skills_to_learn": { "type": "array", "items": { "type": "string" }, "description": "Skills user wants to learn" },
+        "skills_to_offer": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "verified": { "type": "boolean" },
+              "verification_type": { "type": "string", "enum": ["certificate", "assessment", "none"] },
+              "verification_date": { "type": "string", "format": "date-time" }
+            }
+          },
+          "description": "Skills user can teach/swap"
+        },
+        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updated_at": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["id", "full_name", "role"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "User's class notes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Note ID" },
+        "user_id": { "type": "string", "description": "Owner's user ID" },
+        "title": { "type": "string", "description": "Note title" },
+        "content": { "type": "string", "description": "Note content in Markdown" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updated_at": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["user_id", "title", "content"]
+    },
+    "SwapRequest": {
+      "title": "SwapRequest",
+      "description": "Request to swap skills",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Request ID" },
+        "user_id": { "type": "string", "description": "Sender's user ID" },
+        "partner_name": { "type": "string", "description": "Partner's name" },
+        "skill": { "type": "string", "description": "Skill being swapped" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined"], "description": "Request status" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["user_id", "partner_name", "skill", "status"]
+    },
+    "SkillHistory": {
+      "title": "SkillHistory",
+      "description": "User's skill learning history",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "History ID" },
+        "user_id": { "type": "string", "description": "User ID" },
+        "skill": { "type": "string", "description": "Skill name" },
+        "progress": { "type": "integer", "description": "Learning progress percentage" },
+        "status": { "type": "string", "description": "Status (e.g., 'In Progress', 'Completed')" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["user_id", "skill", "progress", "status"]
+    },
+    "Resource": {
+      "title": "Resource",
+      "description": "Shared learning resource",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Resource ID" },
+        "room_id": { "type": "string", "description": "Chat room ID" },
+        "user_id": { "type": "string", "description": "Uploader's user ID" },
+        "title": { "type": "string", "description": "Resource title" },
+        "file_path": { "type": "string", "description": "Path in storage" },
+        "file_type": { "type": "string", "description": "MIME type" },
+        "file_size": { "type": "string", "description": "Formatted file size" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["room_id", "user_id", "title", "file_path"]
+    }
+  }
+}

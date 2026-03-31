@@ -89,11 +89,11 @@ export default function ChatPage() {
 
     setUploadingResource(true);
     try {
-      const { path } = await uploadFile(file, user.id, 'resources', roomId);
+      const { path } = await uploadFile(file, user.uid, 'resources', roomId);
       
       const newResource = await db.resources.create({
         room_id: roomId,
-        user_id: user.id,
+        user_id: user.uid,
         title: file.name,
         file_path: path,
         file_type: file.type,
@@ -473,7 +473,7 @@ export default function ChatPage() {
                               const file = e.target.files?.[0];
                               if (file && user) {
                                 try {
-                                  const { path, url } = await uploadFile(file, user.id, 'chat', roomId);
+                                  const { path, url } = await uploadFile(file, user.uid, 'chat', roomId);
                                   // In a real app, we'd send the path/url via WebSocket
                                   setMessage(prev => prev + ` [Attachment: ${file.name}](${url})`);
                                 } catch (error) {

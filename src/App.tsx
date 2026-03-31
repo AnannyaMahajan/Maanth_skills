@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Navbar, Footer } from './components/Layout';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import MarketplacePage from './pages/MarketplacePage';
 import SkillDetailPage from './pages/SkillDetailPage';
@@ -16,15 +17,22 @@ import ChatPage from './pages/ChatPage';
 import SwapRequestPage from './pages/SwapRequestPage';
 import ProfilePage from './pages/ProfilePage';
 import MatchPage from './pages/MatchPage';
+import AboutUsPage from './pages/AboutUsPage';
 import AuthPage from './pages/AuthPage';
 import VerificationPage from './pages/VerificationPage';
+import OnboardingPage from './pages/OnboardingPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
+  const location = useLocation();
   
   if (loading) return null;
   if (!user) return <Navigate to="/auth" />;
-  if (!user.email_confirmed_at) return <Navigate to="/verify" state={{ email: user.email }} />;
+  
+  // If onboarding not completed and not on onboarding page, redirect
+  if (profile && !profile.onboarding_completed && location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" />;
+  }
   
   return <>{children}</>;
 }
@@ -44,6 +52,7 @@ function AnimatedRoutes() {
         <Routes location={location}>
           <Route path="/" element={<LandingPage />} />
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/about" element={<AboutUsPage />} />
           <Route path="/verify" element={<VerificationPage />} />
           <Route path="/marketplace" element={<MarketplacePage />} />
           <Route path="/marketplace/:id" element={<SkillDetailPage />} />
@@ -52,11 +61,7 @@ function AnimatedRoutes() {
               <SwapRequestPage />
             </ProtectedRoute>
           } />
-          <Route path="/match" element={
-            <ProtectedRoute>
-              <MatchPage />
-            </ProtectedRoute>
-          } />
+          <Route path="/match" element={<MatchPage />} />
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <DashboardPage />
@@ -72,6 +77,11 @@ function AnimatedRoutes() {
               <ProfilePage />
             </ProtectedRoute>
           } />
+          <Route path="/onboarding" element={
+            <ProtectedRoute>
+              <OnboardingPage />
+            </ProtectedRoute>
+          } />
         </Routes>
       </motion.div>
     </AnimatePresence>
@@ -82,19 +92,21 @@ import { Toaster } from 'sonner';
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <Router>
-          <div className="min-h-screen flex flex-col">
-            <Toaster position="top-center" richColors />
-            <Navbar />
-            <main className="flex-grow">
-              <AnimatedRoutes />
-            </main>
-            <Footer />
-          </div>
-        </Router>
-      </NotificationProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <NotificationProvider>
+          <Router>
+            <div className="min-h-screen flex flex-col">
+              <Toaster position="top-center" richColors />
+              <Navbar />
+              <main className="flex-grow">
+                <AnimatedRoutes />
+              </main>
+              <Footer />
+            </div>
+          </Router>
+        </NotificationProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
