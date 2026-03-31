@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { FileText, Save, Plus, Trash2, Clock, CheckCircle2, MoreVertical, AlertCircle, X } from 'lucide-react';
+import { FileText, Save, Plus, Trash2, Clock, CheckCircle2, MoreVertical, AlertCircle, X, Eye, Edit3 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { db } from '../../lib/db';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import ReactMarkdown from 'react-markdown';
+import { toast } from 'sonner';
 
 interface ClassNotesProps {
   socket: WebSocket | null;
@@ -27,6 +29,7 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [upgrading, setUpgrading] = useState(false);
+  const [isPreview, setIsPreview] = useState(false);
 
   const activeNote = notes.find(n => n.id === activeNoteId);
   const isPro = profile?.role === 'pro';
@@ -44,6 +47,7 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
         }
       } catch (error) {
         console.error('Error loading notes:', error);
+        toast.error('Failed to load notes');
       } finally {
         setLoading(false);
       }
@@ -110,6 +114,7 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
       }
     } catch (error) {
       console.error('Error updating note:', error);
+      toast.error('Failed to save changes');
     } finally {
       setTimeout(() => setIsSaving(false), 500);
     }
@@ -123,6 +128,7 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
       setNotes(prev => prev.map(n => n.id === activeNoteId ? updated : n));
     } catch (error) {
       console.error('Error updating title:', error);
+      toast.error('Failed to update title');
     }
   };
 
@@ -147,8 +153,11 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
 
       setNotes(prev => [newNote, ...prev]);
       setActiveNoteId(newNote.id);
+      setIsPreview(false);
+      toast.success('New note created');
     } catch (error) {
       console.error('Error creating note:', error);
+      toast.error('Failed to create note');
     }
   };
 
@@ -159,8 +168,10 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
       await db.profiles.update(user.id, { role: 'pro' });
       await refreshProfile();
       setShowLimitModal(false);
+      toast.success('Welcome to Pro! Unlimited notes unlocked.');
     } catch (error) {
       console.error('Error upgrading profile:', error);
+      toast.error('Upgrade failed. Please try again.');
     } finally {
       setUpgrading(false);
     }
@@ -173,8 +184,10 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
       if (activeNoteId === id) {
         setActiveNoteId(notes.find(n => n.id !== id)?.id || null);
       }
+      toast.success('Note deleted');
     } catch (error) {
       console.error('Error deleting note:', error);
+      toast.error('Failed to delete note');
     }
   };
 
@@ -263,6 +276,17 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
               </div>
               
               <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setIsPreview(!isPreview)}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all",
+                    isPreview ? "bg-primary text-white" : "bg-surface-container text-on-surface-variant hover:bg-surface-container-highest"
+                  )}
+                >
+                  {isPreview ? <Edit3 size={14} /> : <Eye size={14} />}
+                  {isPreview ? 'Edit' : 'Preview'}
+                </button>
+
                 <AnimatePresence>
                   {isSaving && (
                     <motion.div 
@@ -282,13 +306,19 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
               </div>
             </header>
             
-            <div className="flex-1 p-10">
-              <textarea
-                value={activeNote.content}
-                onChange={(e) => updateNote(e.target.value)}
-                placeholder="Start typing your notes here..."
-                className="w-full h-full resize-none border-none focus:ring-0 text-sm leading-relaxed text-on-surface-variant font-medium placeholder:opacity-30"
-              />
+            <div className="flex-1 p-10 overflow-y-auto">
+              {isPreview ? (
+                <div className="prose prose-sm max-w-none text-on-surface-variant">
+                  <ReactMarkdown>{activeNote.content || '*No content yet...*'}</ReactMarkdown>
+                </div>
+              ) : (
+                <textarea
+                  value={activeNote.content}
+                  onChange={(e) => updateNote(e.target.value)}
+                  placeholder="Start typing your notes here... (Markdown supported)"
+                  className="w-full h-full resize-none border-none focus:ring-0 text-sm leading-relaxed text-on-surface-variant font-medium placeholder:opacity-30"
+                />
+              )}
             </div>
           </>
         ) : (

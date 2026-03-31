@@ -20,6 +20,26 @@ export interface Resource {
   created_at?: string;
 }
 
+export interface SwapRequest {
+  id: string;
+  user_id: string;
+  title: string;
+  with_user_name: string;
+  status: 'Pending' | 'Accepted' | 'Completed' | 'Cancelled';
+  category: string;
+  created_at?: string;
+}
+
+export interface SkillHistory {
+  id: string;
+  user_id: string;
+  skill_name: string;
+  participant_name: string;
+  status: 'Completed' | 'Cancelled' | 'In Progress';
+  date: string;
+  created_at?: string;
+}
+
 export const db = {
   profiles: {
     async get(id: string) {
@@ -41,6 +61,30 @@ export const db = {
       
       if (error) throw error;
       return data as Profile;
+    }
+  },
+  swap_requests: {
+    async list(userId: string) {
+      const { data, error } = await supabase
+        .from('swap_requests')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as SwapRequest[];
+    }
+  },
+  skill_history: {
+    async list(userId: string) {
+      const { data, error } = await supabase
+        .from('skill_history')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as SkillHistory[];
     }
   },
   resources: {

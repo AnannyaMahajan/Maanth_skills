@@ -27,29 +27,46 @@ import { db } from '../lib/db';
 import { supabase } from '../lib/supabase';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [noteCount, setNoteCount] = useState<number | null>(null);
+  const [swapRequests, setSwapRequests] = useState<any[]>([]);
+  const [skillHistory, setSkillHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
 
-    const fetchNoteCount = async () => {
+    const fetchData = async () => {
       setLoading(true);
       try {
-        const count = await db.notes.count(user.id);
+        const [count, swaps, history] = await Promise.all([
+          db.notes.count(user.id),
+          db.swap_requests.list(user.id).catch(() => [
+            { title: 'Digital Illustration for SEO Writing', with_user_name: 'Sarah Jenkins', status: 'Accepted', category: 'design' },
+            { title: 'React Mentorship for Pottery Lessons', with_user_name: 'David K.', status: 'Pending', category: 'code' },
+            { title: 'Mandarin Practice for UI Design', with_user_name: 'Li Wei', status: 'Accepted', category: 'languages' }
+          ]),
+          db.skill_history.list(user.id).catch(() => [
+            { skill_name: 'Digital Illustration', participant_name: 'Sarah Jenkins', status: 'Completed', date: 'Oct 12, 2024' },
+            { skill_name: 'SEO Writing', participant_name: 'Sarah Jenkins', status: 'Completed', date: 'Oct 12, 2024' },
+            { skill_name: 'Pottery Basics', participant_name: 'David K.', status: 'Cancelled', date: 'Sep 28, 2024' },
+            { skill_name: 'React Mentorship', participant_name: 'David K.', status: 'In Progress', date: 'Ongoing' },
+          ])
+        ]);
         setNoteCount(count);
+        setSwapRequests(swaps);
+        setSkillHistory(history);
       } catch (error) {
-        console.error('Error fetching note count:', error);
+        console.error('Error fetching dashboard data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchNoteCount();
+    fetchData();
 
     const subscription = supabase
-      .channel('notes_count_changes')
+      .channel('dashboard_changes')
       .on(
         'postgres_changes',
         {
@@ -59,7 +76,7 @@ export default function DashboardPage() {
           filter: `user_id=eq.${user.id}`
         },
         () => {
-          fetchNoteCount();
+          fetchData();
         }
       )
       .subscribe();
@@ -68,6 +85,42 @@ export default function DashboardPage() {
       subscription.unsubscribe();
     };
   }, [user]);
+
+  const getIcon = (category: string) => {
+    switch (category) {
+      case 'design': return Palette;
+      case 'code': return Code;
+      case 'languages': return Languages;
+      default: return Sparkles;
+    }
+  };
+
+  const getColor = (category: string) => {
+    switch (category) {
+      case 'design': return 'bg-primary-container text-on-primary-container';
+      case 'code': return 'bg-tertiary-container text-on-tertiary-container';
+      case 'languages': return 'bg-primary-container text-on-primary-container';
+      default: return 'bg-secondary-container text-on-secondary-container';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'Completed': return CheckCircle2;
+      case 'Cancelled': return XCircle;
+      case 'In Progress': return Clock;
+      default: return Clock;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Completed': return 'text-green-600 bg-green-50';
+      case 'Cancelled': return 'text-red-600 bg-red-50';
+      case 'In Progress': return 'text-blue-600 bg-blue-50';
+      default: return 'text-blue-600 bg-blue-50';
+    }
+  };
 
   return (
     <div className="flex h-[calc(100vh-80px)] overflow-hidden">
@@ -113,16 +166,22 @@ export default function DashboardPage() {
         >
           <div>
             <p className="text-sm font-bold uppercase tracking-widest text-on-surface-variant mb-2">Welcome back</p>
-            <h2 className="text-5xl font-extrabold text-primary tracking-tighter">Julian.</h2>
+            <h2 className="text-5xl font-extrabold text-primary tracking-tighter">
+              {profile?.full_name?.split(' ')[0] || 'User'}.
+            </h2>
           </div>
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden">
-              <img 
-                src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop" 
-                alt="Julian" 
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
+            <div className="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden border-2 border-primary/10">
+              {profile?.avatar_url ? (
+                <img 
+                  src={profile.avatar_url} 
+                  alt={profile.full_name} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <User size={24} className="text-primary" />
+              )}
             </div>
           </div>
         </motion.header>
@@ -159,45 +218,45 @@ export default function DashboardPage() {
             <div className="bg-surface-container-low rounded-xl p-8">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-primary">Active Swap Requests</h3>
-                <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">3 Total</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                  {swapRequests.length} Total
+                </span>
               </div>
               <div className="space-y-4">
-                {/* Swap Items */}
-                {[
-                  { title: 'Digital Illustration for SEO Writing', with: 'Sarah Jenkins', status: 'Accepted', icon: Palette, color: 'bg-primary-container text-on-primary-container' },
-                  { title: 'React Mentorship for Pottery Lessons', with: 'David K.', status: 'Pending', icon: Code, color: 'bg-tertiary-container text-on-tertiary-container' },
-                  { title: 'Mandarin Practice for UI Design', with: 'Li Wei', status: 'Accepted', icon: Languages, color: 'bg-primary-container text-on-primary-container' }
-                ].map((swap, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 + i * 0.1 }}
-                  >
-                    <Link 
-                      to="/chat"
-                      className="bg-surface-container-lowest p-6 rounded-xl flex items-center justify-between group hover:bg-surface-bright transition-all duration-300"
+                {swapRequests.map((swap, i) => {
+                  const Icon = getIcon(swap.category);
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 + i * 0.1 }}
                     >
-                      <div className="flex items-center gap-6">
-                        <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${swap.color}`}>
-                          <swap.icon size={24} />
+                      <Link 
+                        to="/chat"
+                        className="bg-surface-container-lowest p-6 rounded-xl flex items-center justify-between group hover:bg-surface-bright transition-all duration-300"
+                      >
+                        <div className="flex items-center gap-6">
+                          <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${getColor(swap.category)}`}>
+                            <Icon size={24} />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-on-surface">{swap.title}</h4>
+                            <p className="text-sm text-on-surface-variant">with {swap.with_user_name}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-bold text-on-surface">{swap.title}</h4>
-                          <p className="text-sm text-on-surface-variant">with {swap.with}</p>
+                        <div className="flex items-center gap-4">
+                          <span className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-full ${
+                            swap.status === 'Accepted' ? 'bg-secondary-fixed text-on-secondary-fixed' : 'bg-surface-container-highest text-on-surface-variant'
+                          }`}>
+                            {swap.status}
+                          </span>
+                          <ChevronRight size={20} className="text-outline-variant group-hover:text-primary transition-colors" />
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-full ${
-                          swap.status === 'Accepted' ? 'bg-secondary-fixed text-on-secondary-fixed' : 'bg-surface-container-highest text-on-surface-variant'
-                        }`}>
-                          {swap.status}
-                        </span>
-                        <ChevronRight size={20} className="text-outline-variant group-hover:text-primary transition-colors" />
-                      </div>
-                    </Link>
-                  </motion.div>
-                ))}
+                      </Link>
+                    </motion.div>
+                  );
+                })}
               </div>
             </div>
 
@@ -236,52 +295,52 @@ export default function DashboardPage() {
                   </div>
                   <h3 className="text-xl font-bold text-primary">Skill Swap History</h3>
                 </div>
-                <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">4 Total</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                  {skillHistory.length} Total
+                </span>
               </div>
               
               <div className="space-y-4">
-                {[
-                  { skill: 'Digital Illustration', participant: 'Sarah Jenkins', status: 'Completed', date: 'Oct 12, 2024', icon: CheckCircle2, color: 'text-green-600 bg-green-50' },
-                  { skill: 'SEO Writing', participant: 'Sarah Jenkins', status: 'Completed', date: 'Oct 12, 2024', icon: CheckCircle2, color: 'text-green-600 bg-green-50' },
-                  { skill: 'Pottery Basics', participant: 'David K.', status: 'Cancelled', date: 'Sep 28, 2024', icon: XCircle, color: 'text-red-600 bg-red-50' },
-                  { skill: 'React Mentorship', participant: 'David K.', status: 'In Progress', date: 'Ongoing', icon: Clock, color: 'text-blue-600 bg-blue-50' },
-                ].map((entry, i) => (
-                  <div 
-                    key={i}
-                    className="bg-surface-container-lowest p-6 rounded-xl flex items-center justify-between group hover:bg-surface-bright transition-all duration-300 border border-transparent hover:border-outline-variant/30"
-                  >
-                    <div className="flex items-center gap-6">
-                      <div className="w-14 h-14 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
-                         <img 
-                           src={`https://i.pravatar.cc/100?u=${entry.participant}`} 
-                           alt={entry.participant} 
-                           className="w-full h-full object-cover"
-                           referrerPolicy="no-referrer"
-                         />
+                {skillHistory.map((entry, i) => {
+                  const StatusIcon = getStatusIcon(entry.status);
+                  return (
+                    <div 
+                      key={i}
+                      className="bg-surface-container-lowest p-6 rounded-xl flex items-center justify-between group hover:bg-surface-bright transition-all duration-300 border border-transparent hover:border-outline-variant/30"
+                    >
+                      <div className="flex items-center gap-6">
+                        <div className="w-14 h-14 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
+                           <img 
+                             src={`https://i.pravatar.cc/100?u=${entry.participant_name}`} 
+                             alt={entry.participant_name} 
+                             className="w-full h-full object-cover"
+                             referrerPolicy="no-referrer"
+                           />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-on-surface group-hover:text-primary transition-colors">{entry.skill_name}</h4>
+                          <p className="text-sm text-on-surface-variant">with {entry.participant_name}</p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-bold text-on-surface group-hover:text-primary transition-colors">{entry.skill}</h4>
-                        <p className="text-sm text-on-surface-variant">with {entry.participant}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-8">
-                      <div className="hidden md:block text-right">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-1">Date</p>
-                        <p className="text-xs font-bold text-on-surface">{entry.date}</p>
-                      </div>
-                      <div className={cn(
-                        "flex items-center gap-2 px-4 py-2 rounded-full",
-                        entry.color
-                      )}>
-                        <entry.icon size={14} />
-                        <span className="text-[10px] font-black uppercase tracking-wider">
-                          {entry.status}
-                        </span>
+                      
+                      <div className="flex items-center gap-8">
+                        <div className="hidden md:block text-right">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-1">Date</p>
+                          <p className="text-xs font-bold text-on-surface">{entry.date}</p>
+                        </div>
+                        <div className={cn(
+                          "flex items-center gap-2 px-4 py-2 rounded-full",
+                          getStatusColor(entry.status)
+                        )}>
+                          <StatusIcon size={14} />
+                          <span className="text-[10px] font-black uppercase tracking-wider">
+                            {entry.status}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               
               <button className="mt-8 w-full py-4 border-2 border-dashed border-outline-variant rounded-xl text-on-surface-variant font-bold text-sm hover:bg-surface-container transition-all flex items-center justify-center gap-2">

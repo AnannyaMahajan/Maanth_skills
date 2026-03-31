@@ -78,12 +78,15 @@ function AnimatedRoutes() {
   );
 }
 
+import { Toaster } from 'sonner';
+
 export default function App() {
   return (
     <AuthProvider>
       <NotificationProvider>
         <Router>
           <div className="min-h-screen flex flex-col">
+            <Toaster position="top-center" richColors />
             <Navbar />
             <main className="flex-grow">
               <AnimatedRoutes />
