@@ -105,17 +105,21 @@ export default function OnboardingPage() {
     if (!user) return;
     setLoading(true);
     try {
+      // Strip temp_id from skills_to_offer before saving
+      const cleanedSkillsOffer = formData.skills_to_offer.map(({ temp_id, ...rest }) => rest);
+      
       await db.profiles.update(user.uid, {
         ...formData,
+        skills_to_offer: cleanedSkillsOffer,
         onboarding_completed: true,
         updated_at: new Date().toISOString()
       });
       await refreshProfile();
       toast.success('Profile setup complete!');
       navigate('/dashboard');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error finishing onboarding:', error);
-      toast.error('Failed to save profile');
+      toast.error(`Failed to save profile: ${error.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
