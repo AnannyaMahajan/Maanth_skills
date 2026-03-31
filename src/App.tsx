@@ -24,7 +24,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   
   if (loading) return null;
   if (!user) return <Navigate to="/auth" />;
-  if (!user.emailVerified) return <Navigate to="/verify" state={{ email: user.email }} />;
+  if (!user.email_confirmed_at) return <Navigate to="/verify" state={{ email: user.email }} />;
   
   return <>{children}</>;
 }

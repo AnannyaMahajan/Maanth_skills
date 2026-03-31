@@ -82,6 +82,45 @@ export const db = {
       
       if (error) throw error;
       return count || 0;
+    },
+    async list(userId: string) {
+      const { data, error } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+    async create(note: { user_id: string; title: string; content: string }) {
+      const { data, error } = await supabase
+        .from('notes')
+        .insert(note)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    async update(id: string, note: { title?: string; content?: string }) {
+      const { data, error } = await supabase
+        .from('notes')
+        .update({ ...note, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    async delete(id: string) {
+      const { error } = await supabase
+        .from('notes')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
     }
   }
 };

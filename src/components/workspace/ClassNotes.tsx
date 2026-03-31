@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { FileText, Save, Plus, Trash2, Clock, CheckCircle2, MoreVertical } from 'lucide-react';
+import { FileText, Save, Plus, Trash2, Clock, CheckCircle2, MoreVertical, AlertCircle, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { db } from '../../lib/db';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 interface ClassNotesProps {
   socket: WebSocket | null;
@@ -12,40 +15,73 @@ interface Note {
   id: string;
   title: string;
   content: string;
-  lastEdited: string;
-  author: string;
+  updated_at: string;
+  user_id: string;
 }
 
 export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
-  const [notes, setNotes] = React.useState<Note[]>([
-    {
-      id: '1',
-      title: 'UI Design Principles',
-      content: 'Focus on visual hierarchy, accessibility, and user feedback. Mobile-first approach is key.',
-      lastEdited: '10:45 AM',
-      author: 'Julian'
-    },
-    {
-      id: '2',
-      title: 'Pottery Techniques',
-      content: 'Wheel throwing basics: Centering, opening, and pulling. Kiln firing temperatures (Cone 6).',
-      lastEdited: 'Yesterday',
-      author: 'Elena Rossi'
-    }
-  ]);
-  const [activeNoteId, setActiveNoteId] = React.useState<string | null>(notes[0].id);
-  const [isSaving, setIsSaving] = React.useState(false);
+  const { user, profile, refreshProfile } = useAuth();
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [upgrading, setUpgrading] = useState(false);
 
   const activeNote = notes.find(n => n.id === activeNoteId);
+  const isPro = profile?.role === 'pro';
 
-  React.useEffect(() => {
+  useEffect(() => {
+    if (!user) return;
+
+    const loadNotes = async () => {
+      setLoading(true);
+      try {
+        const data = await db.notes.list(user.id);
+        setNotes(data || []);
+        if (data && data.length > 0) {
+          setActiveNoteId(data[0].id);
+        }
+      } catch (error) {
+        console.error('Error loading notes:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadNotes();
+
+    // Subscribe to changes
+    const channel = supabase
+      .channel('notes_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notes',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          loadNotes();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [user]);
+
+  useEffect(() => {
     if (!socket) return;
 
     const handleMessage = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'notes_update' && data.roomId === roomId) {
-          setNotes(data.notes);
+          // For real-time collaboration, we might still want to sync local state
+          // but the database is the source of truth
         }
       } catch (e) {
         console.error('Error parsing notes message:', e);
@@ -56,56 +92,94 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
     return () => socket.removeEventListener('message', handleMessage);
   }, [socket, roomId]);
 
-  const updateNote = (content: string) => {
-    if (!activeNoteId) return;
+  const updateNote = async (content: string) => {
+    if (!activeNoteId || !user) return;
     
-    const updatedNotes = notes.map(n => 
-      n.id === activeNoteId 
-        ? { ...n, content, lastEdited: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) } 
-        : n
-    );
-    
-    setNotes(updatedNotes);
-    broadcastUpdate(updatedNotes);
-  };
-
-  const broadcastUpdate = (newNotes: Note[]) => {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      setIsSaving(true);
-      socket.send(JSON.stringify({
-        type: 'notes_update',
-        roomId,
-        notes: newNotes
-      }));
-      setTimeout(() => setIsSaving(false), 1000);
+    setIsSaving(true);
+    try {
+      const updated = await db.notes.update(activeNoteId, { content });
+      setNotes(prev => prev.map(n => n.id === activeNoteId ? updated : n));
+      
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({
+          type: 'notes_update',
+          roomId,
+          noteId: activeNoteId,
+          content
+        }));
+      }
+    } catch (error) {
+      console.error('Error updating note:', error);
+    } finally {
+      setTimeout(() => setIsSaving(false), 500);
     }
   };
 
-  const addNewNote = () => {
-    const newNote: Note = {
-      id: Date.now().toString(),
-      title: 'Untitled Note',
-      content: '',
-      lastEdited: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      author: 'Julian'
-    };
-    const updatedNotes = [newNote, ...notes];
-    setNotes(updatedNotes);
-    setActiveNoteId(newNote.id);
-    broadcastUpdate(updatedNotes);
+  const updateTitle = async (title: string) => {
+    if (!activeNoteId || !user) return;
+    
+    try {
+      const updated = await db.notes.update(activeNoteId, { title });
+      setNotes(prev => prev.map(n => n.id === activeNoteId ? updated : n));
+    } catch (error) {
+      console.error('Error updating title:', error);
+    }
   };
 
-  const deleteNote = (id: string) => {
-    const updatedNotes = notes.filter(n => n.id !== id);
-    setNotes(updatedNotes);
-    if (activeNoteId === id) {
-      setActiveNoteId(updatedNotes[0]?.id || null);
+  const addNewNote = async () => {
+    if (!user) return;
+
+    // SaaS Plan Logic: Check limit for non-pro users
+    try {
+      if (!isPro) {
+        const count = await db.notes.count(user.id);
+        if (count >= 3) {
+          setShowLimitModal(true);
+          return;
+        }
+      }
+
+      const newNote = await db.notes.create({
+        user_id: user.id,
+        title: 'Untitled Note',
+        content: ''
+      });
+
+      setNotes(prev => [newNote, ...prev]);
+      setActiveNoteId(newNote.id);
+    } catch (error) {
+      console.error('Error creating note:', error);
     }
-    broadcastUpdate(updatedNotes);
+  };
+
+  const handleUpgrade = async () => {
+    if (!user) return;
+    setUpgrading(true);
+    try {
+      await db.profiles.update(user.id, { role: 'pro' });
+      await refreshProfile();
+      setShowLimitModal(false);
+    } catch (error) {
+      console.error('Error upgrading profile:', error);
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
+  const deleteNote = async (id: string) => {
+    try {
+      await db.notes.delete(id);
+      setNotes(prev => prev.filter(n => n.id !== id));
+      if (activeNoteId === id) {
+        setActiveNoteId(notes.find(n => n.id !== id)?.id || null);
+      }
+    } catch (error) {
+      console.error('Error deleting note:', error);
+    }
   };
 
   return (
-    <div className="flex h-full bg-white overflow-hidden">
+    <div className="flex h-full bg-white overflow-hidden relative">
       {/* Sidebar */}
       <aside className="w-64 border-r border-surface-container-high bg-[#F9F7F4] flex flex-col">
         <div className="p-6 border-b border-surface-container-high flex justify-between items-center">
@@ -119,39 +193,49 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
         </div>
         
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {notes.map((note) => (
-            <div
-              key={note.id}
-              onClick={() => setActiveNoteId(note.id)}
-              className={cn(
-                "w-full text-left p-4 rounded-2xl transition-all group relative cursor-pointer",
-                activeNoteId === note.id ? "bg-white shadow-sm border border-surface-container-high" : "hover:bg-white/50"
-              )}
-            >
-              <div className="flex items-center gap-3 mb-1">
-                <FileText size={14} className={activeNoteId === note.id ? "text-primary" : "text-on-surface-variant"} />
-                <h4 className={cn(
-                  "text-xs font-bold truncate",
-                  activeNoteId === note.id ? "text-primary" : "text-on-surface-variant"
-                )}>
-                  {note.title}
-                </h4>
-              </div>
-              <p className="text-[10px] text-on-surface-variant truncate opacity-60">
-                {note.content || 'Empty note...'}
-              </p>
-              
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteNote(note.id);
-                }}
-                className="absolute top-2 right-2 p-1.5 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-destructive rounded-lg transition-all"
-              >
-                <Trash2 size={12} />
-              </button>
+          {loading ? (
+            <div className="p-4 text-center text-[10px] font-bold text-on-surface-variant uppercase tracking-widest opacity-50">
+              Loading notes...
             </div>
-          ))}
+          ) : notes.length === 0 ? (
+            <div className="p-4 text-center text-[10px] font-bold text-on-surface-variant uppercase tracking-widest opacity-50">
+              No notes yet
+            </div>
+          ) : (
+            notes.map((note) => (
+              <div
+                key={note.id}
+                onClick={() => setActiveNoteId(note.id)}
+                className={cn(
+                  "w-full text-left p-4 rounded-2xl transition-all group relative cursor-pointer",
+                  activeNoteId === note.id ? "bg-white shadow-sm border border-surface-container-high" : "hover:bg-white/50"
+                )}
+              >
+                <div className="flex items-center gap-3 mb-1">
+                  <FileText size={14} className={activeNoteId === note.id ? "text-primary" : "text-on-surface-variant"} />
+                  <h4 className={cn(
+                    "text-xs font-bold truncate",
+                    activeNoteId === note.id ? "text-primary" : "text-on-surface-variant"
+                  )}>
+                    {note.title}
+                  </h4>
+                </div>
+                <p className="text-[10px] text-on-surface-variant truncate opacity-60">
+                  {note.content || 'Empty note...'}
+                </p>
+                
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteNote(note.id);
+                  }}
+                  className="absolute top-2 right-2 p-1.5 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-destructive rounded-lg transition-all"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </aside>
 
@@ -168,16 +252,12 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
                   <input 
                     type="text" 
                     value={activeNote.title}
-                    onChange={(e) => {
-                      const updatedNotes = notes.map(n => n.id === activeNoteId ? { ...n, title: e.target.value } : n);
-                      setNotes(updatedNotes);
-                      broadcastUpdate(updatedNotes);
-                    }}
+                    onChange={(e) => updateTitle(e.target.value)}
                     className="text-lg font-black text-primary bg-transparent border-none focus:ring-0 p-0"
                   />
                   <div className="flex items-center gap-2 text-[10px] font-bold text-on-surface-variant uppercase tracking-widest opacity-60">
                     <Clock size={10} />
-                    Last edited {activeNote.lastEdited} by {activeNote.author}
+                    Last edited {new Date(activeNote.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
               </div>
@@ -231,6 +311,61 @@ export default function ClassNotes({ socket, roomId }: ClassNotesProps) {
           </div>
         )}
       </main>
+
+      {/* SaaS Limit Modal */}
+      <AnimatePresence>
+        {showLimitModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-[2.5rem] p-10 max-w-md w-full shadow-2xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-6">
+                <button 
+                  onClick={() => setShowLimitModal(false)}
+                  className="p-2 hover:bg-surface-container rounded-full text-on-surface-variant transition-all"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-8">
+                <div className="w-20 h-20 bg-secondary-container rounded-3xl flex items-center justify-center text-on-secondary-container mx-auto">
+                  <AlertCircle size={40} />
+                </div>
+
+                <div className="text-center space-y-4">
+                  <h3 className="text-3xl font-black text-primary tracking-tight italic">Plan Limit Reached</h3>
+                  <p className="text-sm text-on-surface-variant font-medium leading-relaxed">
+                    Free plan limit reached. Upgrade to Pro to create unlimited notes and unlock advanced collaboration features.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <button 
+                    onClick={handleUpgrade}
+                    disabled={upgrading}
+                    className="w-full py-4 bg-[#002A24] text-white rounded-full font-black text-[10px] uppercase tracking-[0.2em] hover:scale-[1.02] transition-all shadow-lg disabled:opacity-50"
+                  >
+                    {upgrading ? 'Upgrading...' : 'Upgrade to Pro'}
+                  </button>
+                  <button 
+                    onClick={() => setShowLimitModal(false)}
+                    className="w-full py-4 bg-surface-container-low text-primary rounded-full font-bold text-[10px] uppercase tracking-[0.2em] hover:bg-surface-container transition-all"
+                  >
+                    Maybe Later
+                  </button>
+                </div>
+              </div>
+
+              {/* Decorative background element */}
+              <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-secondary-container rounded-full blur-3xl opacity-30" />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

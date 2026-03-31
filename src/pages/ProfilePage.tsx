@@ -19,7 +19,7 @@ export default function ProfilePage() {
     async function loadProfile() {
       if (!user) return;
       try {
-        const profile = await db.profiles.get(user.uid);
+        const profile = await db.profiles.get(user.id);
         if (profile?.avatar_url) {
           setAvatarPath(profile.avatar_url);
           const signedUrl = await getSignedUrl(profile.avatar_url);
@@ -48,10 +48,10 @@ export default function ProfilePage() {
       }
 
       // Upload new file
-      const { path, url } = await uploadFile(file, user.uid, 'profile', 'avatar');
+      const { path, url } = await uploadFile(file, user.id, 'profile', 'avatar');
       
       // Save path to database
-      await db.profiles.update(user.uid, { avatar_url: path });
+      await db.profiles.update(user.id, { avatar_url: path });
       
       setAvatarPath(path);
       setAvatar(url);

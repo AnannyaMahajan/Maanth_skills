@@ -17,11 +17,58 @@ import {
   History,
   CheckCircle2,
   Clock,
-  XCircle
+  XCircle,
+  FileText
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { db } from '../lib/db';
+import { supabase } from '../lib/supabase';
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  const [noteCount, setNoteCount] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchNoteCount = async () => {
+      setLoading(true);
+      try {
+        const count = await db.notes.count(user.id);
+        setNoteCount(count);
+      } catch (error) {
+        console.error('Error fetching note count:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNoteCount();
+
+    const subscription = supabase
+      .channel('notes_count_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notes',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          fetchNoteCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [user]);
+
   return (
     <div className="flex h-[calc(100vh-80px)] overflow-hidden">
       {/* Sidebar Navigation */}
@@ -89,6 +136,26 @@ export default function DashboardPage() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="col-span-12 lg:col-span-8 space-y-8"
           >
+            {/* Total Notes Card */}
+            <div className="bg-surface-container-low rounded-xl p-8 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                  <FileText size={28} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-primary">Total Notes</h3>
+                  <p className="text-sm text-on-surface-variant">Your total count of notes</p>
+                </div>
+              </div>
+              <div className="text-right">
+                {loading ? (
+                  <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Loading...</span>
+                ) : (
+                  <span className="text-4xl font-black text-primary">{noteCount !== null ? noteCount : 0}</span>
+                )}
+              </div>
+            </div>
+
             <div className="bg-surface-container-low rounded-xl p-8">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-primary">Active Swap Requests</h3>

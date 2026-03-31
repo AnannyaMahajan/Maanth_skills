@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { auth } from '../firebase';
+import { supabase } from '../lib/supabase';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
@@ -21,40 +20,35 @@ export default function AuthPage() {
 
     try {
       if (isLogin) {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
         
-        if (!user.emailVerified) {
-          await signOut(auth);
-          navigate('/verify', { state: { email: user.email } });
+        if (signInError) throw signInError;
+        
+        if (data.user && !data.user.email_confirmed_at) {
+          await supabase.auth.signOut();
+          navigate('/verify', { state: { email: data.user.email } });
           return;
         }
         
         navigate('/dashboard');
       } else {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
         
-        await sendEmailVerification(user);
-        await signOut(auth);
+        if (signUpError) throw signUpError;
         
-        navigate('/verify', { state: { email: user.email } });
+        if (data.user) {
+          navigate('/verify', { state: { email: data.user.email } });
+        }
       }
     } catch (err: any) {
       console.error(err);
-      if (isLogin) {
-        if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-          setError('Email or password is incorrect');
-        } else {
-          setError('An error occurred. Please try again.');
-        }
-      } else {
-        if (err.code === 'auth/email-already-in-use') {
-          setError('User already exists. Please sign in');
-        } else {
-          setError('An error occurred. Please try again.');
-        }
-      }
+      setError(err.message || 'An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -63,10 +57,14 @@ export default function AuthPage() {
   const handleGoogleSignIn = async () => {
     setError(null);
     setLoading(true);
-    const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
-      navigate('/dashboard');
+      const { error: googleError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`
+        }
+      });
+      if (googleError) throw googleError;
     } catch (err: any) {
       console.error(err);
       setError('Failed to sign in with Google. Please try again.');
